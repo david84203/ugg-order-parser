@@ -21,16 +21,26 @@ export default function SupplierModal({ supplier, onSave, onDelete, onClose }) {
   async function handleSave() {
     if (!form.name.trim()) return
     setSaving(true)
-    await onSave({ ...form, name: form.name.trim() })
-    setSaving(false)
-    onClose()
+    try {
+      await onSave({ ...form, name: form.name.trim() })
+      onClose()
+    } catch (err) {
+      console.error('儲存廠商失敗:', err)
+    } finally {
+      setSaving(false)
+    }
   }
 
   async function handleDelete() {
     setSaving(true)
-    await onDelete(supplier.id)
-    setSaving(false)
-    onClose()
+    try {
+      await onDelete(supplier.id)
+      onClose()
+    } catch (err) {
+      console.error('刪除廠商失敗:', err)
+    } finally {
+      setSaving(false)
+    }
   }
 
   return (
