@@ -13,7 +13,10 @@ export function useSuppliers() {
     const unsub = onSnapshot(q, snap => {
       setSuppliers(snap.docs.map(d => ({ id: d.id, ...d.data() })))
       setLoading(false)
-    }, err => console.error('suppliers snapshot error', err))
+    }, err => {
+      console.error('suppliers snapshot error', err)
+      setLoading(false)
+    })
     return unsub
   }, [])
 
