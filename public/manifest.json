@@ -1,0 +1,17 @@
+{
+  "name": "進貨管理系統",
+  "short_name": "進貨系統",
+  "description": "廠商管理、Excel 訂單解析、匯入倉儲",
+  "start_url": "/",
+  "display": "standalone",
+  "background_color": "#ffffff",
+  "theme_color": "#f97316",
+  "icons": [
+    {
+      "src": "/icon.svg",
+      "sizes": "any",
+      "type": "image/svg+xml",
+      "purpose": "any"
+    }
+  ]
+}
