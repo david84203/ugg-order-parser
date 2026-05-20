@@ -35,22 +35,27 @@ export default async function handler(req, res) {
     const rows = games.map(g => {
       const row = Array(26).fill('')
       row[0]  = g.name || ''
-      row[1]  = g.englishName || ''
-      row[3]  = g.lang || ''
-      row[4]  = g.players || ''
-      row[5]  = g.location || ''
-      row[10] = g.bggUrl || ''
-      row[13] = g.msrp || g.price || ''
-      row[14] = g.rental || ''
-      row[15] = g.category || ''
-      row[16] = g.tag1 || ''
-      row[17] = g.tag2 || ''
-      row[18] = g.tag3 || ''
-      row[19] = g.sticker || ''
-      row[20] = g.imageUrl || ''
-      row[21] = g.youtubeLink || ''
-      row[22] = g.source || ''     // W: 出處
-      row[25] = today              // Z: 到貨日
+      row[2]  = g.englishName || ''      // C: 英文名稱
+      row[3]  = g.lang || ''             // D: 語言版本
+      row[4]  = g.players || ''          // E: 遊戲人數
+      row[5]  = g.location || ''         // F: 放置櫃位
+      row[6]  = g.bggRating || ''        // G: BGG玩家評分
+      row[7]  = g.bestPlayers || ''      // H: BGG建議最佳人數
+      row[8]  = g.playTime || ''         // I: BGG遊戲時間(分鐘)
+      row[9]  = g.complexity || ''       // J: BGG遊戲難度
+      row[10] = g.bggUrl || ''           // K: BGG連結
+      row[13] = g.msrp || g.price || '' // N: 定價
+      row[14] = g.rental || ''           // O: 租金
+      row[15] = g.category || ''         // P: 分類
+      row[16] = g.tag1 || ''             // Q: 標籤1
+      row[17] = g.tag2 || ''             // R: 標籤2
+      row[18] = g.tag3 || ''             // S: 標籤3
+      row[19] = g.sticker || ''          // T: 貼紙
+      row[20] = g.imageUrl ? 'v' : ''   // U: 圖片（有上傳就打v）
+      row[21] = g.youtubeLink || ''      // V: 教學
+      row[22] = g.source || ''           // W: 出處
+      row[23] = g.playerMode || ''       // X: 玩家模式
+      row[25] = today                    // Z: 到貨日
       return row
     })
 

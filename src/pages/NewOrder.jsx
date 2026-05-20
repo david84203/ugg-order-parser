@@ -220,8 +220,13 @@ export default function NewOrder() {
             imageUrl: openBoxData?.imageUrl || '',
             youtubeLink: openBoxData?.youtubeLink || '',
             source: openBoxData?.source || '',
+            playerMode: openBoxData?.playerMode || '',
             rental: openBoxData?.rental || '',
             englishName: openBoxData?.englishName || '',
+            bggRating: openBoxData?.bggRating || '',
+            bestPlayers: openBoxData?.bestPlayers || '',
+            playTime: openBoxData?.playTime || '',
+            complexity: openBoxData?.complexity || '',
           }))),
         })
         if (!res.ok) throw new Error('Google Sheet 寫入失敗')

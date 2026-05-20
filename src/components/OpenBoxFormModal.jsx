@@ -14,6 +14,8 @@ const emptyExtra = {
   englishName: '', bggRating: '', bestPlayers: '', playTime: '', complexity: '',
 }
 
+const PLAYER_MODES = ['輕鬆', '動腦', '超燒腦']
+
 const EXTRA_FIELDS = [
   { key: 'lang',        label: '語言版本', placeholder: '例：繁中' },
   { key: 'location',    label: '放置櫃位', placeholder: '例：A3' },
@@ -23,7 +25,7 @@ const EXTRA_FIELDS = [
   { key: 'tag2',        label: '標籤 2',   placeholder: '' },
   { key: 'tag3',        label: '標籤 3',   placeholder: '' },
   { key: 'youtubeLink', label: '教學連結', placeholder: 'YouTube 網址', span2: true },
-  { key: 'source',     label: '來源',     placeholder: '例：XIAN在玩桌遊', span2: true },
+  { key: 'source',      label: '來源',     placeholder: '例：XIAN在玩桌遊', span2: true },
 ]
 
 export default function OpenBoxFormModal({ item, onSave, onCancel }) {
@@ -257,6 +259,26 @@ export default function OpenBoxFormModal({ item, onSave, onCancel }) {
             </button>
             {showExtra && (
               <div className="px-4 pb-4 pt-3 grid grid-cols-2 gap-3 border-t border-gray-100">
+                {/* 玩家模式 */}
+                <div className="col-span-2">
+                  <label className="block text-xs text-gray-400 mb-1.5">玩家模式</label>
+                  <div className="flex gap-2">
+                    {PLAYER_MODES.map(mode => (
+                      <button
+                        key={mode}
+                        type="button"
+                        onClick={() => set('playerMode', form.playerMode === mode ? '' : mode)}
+                        className={`flex-1 py-1.5 rounded-lg text-xs font-medium transition border ${
+                          form.playerMode === mode
+                            ? 'bg-orange-500 text-white border-orange-500'
+                            : 'bg-white text-gray-500 border-gray-200 hover:border-orange-300'
+                        }`}
+                      >
+                        {mode}
+                      </button>
+                    ))}
+                  </div>
+                </div>
                 {EXTRA_FIELDS.map(f => (
                   <div key={f.key} className={f.span2 ? 'col-span-2' : ''}>
                     <label className="block text-xs text-gray-400 mb-1">{f.label}</label>
