@@ -159,8 +159,10 @@ export default function NewOrder() {
 
   const inventoryItems = items.filter(i => !i.isOpenBox)
   const openBoxItems = items.filter(i => i.isOpenBox)
+  // 開盒遊戲只算 1 盒成本，剩餘 qty-1 算進庫存成本
   const inventoryCost = inventoryItems.reduce((s, i) => s + (i.cost || 0) * (i.qty || 1), 0)
-  const openBoxCost = openBoxItems.reduce((s, i) => s + (i.cost || 0) * (i.qty || 1), 0)
+    + openBoxItems.reduce((s, i) => s + (i.cost || 0) * Math.max(0, (i.qty || 1) - 1), 0)
+  const openBoxCost = openBoxItems.reduce((s, i) => s + (i.cost || 0), 0)
   const totalAmount = inventoryCost + openBoxCost
 
   async function handleConfirm() {
@@ -168,13 +170,17 @@ export default function NewOrder() {
     setSyncing(true)
     setParseError('')
     try {
-      // 非開盒 → 庫存
+      // 庫存同步：非開盒的全部 + 開盒遊戲剩餘 qty-1 盒
+      const inventorySyncItems = [
+        ...inventoryItems,
+        ...openBoxItems.filter(i => (i.qty || 1) > 1).map(i => ({ ...i, qty: i.qty - 1 })),
+      ]
       let result = { added: 0, updated: 0, errors: [] }
-      if (inventoryItems.length > 0) {
-        result = await syncToInventory(inventoryItems)
+      if (inventorySyncItems.length > 0) {
+        result = await syncToInventory(inventorySyncItems)
       }
 
-      // 開盒 → Google Sheet
+      // 開盒 → Google Sheet（每款只寫 1 盒，不管 qty 多少）
       if (openBoxItems.length > 0) {
         const res = await fetch('/api/write-sheet', {
           method: 'POST',
