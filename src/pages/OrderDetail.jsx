@@ -3,7 +3,7 @@ import { useParams, useNavigate } from 'react-router-dom'
 import { ArrowLeft, Trash2 } from 'lucide-react'
 import { useOrders } from '../hooks/useOrders'
 import { db } from '../firebase/config'
-import { deleteDoc, doc } from 'firebase/firestore'
+import { deleteDoc, doc, collection, query, where, getDocs, writeBatch, increment } from 'firebase/firestore'
 
 export default function OrderDetail() {
   const { id } = useParams()
@@ -23,10 +23,43 @@ export default function OrderDetail() {
   const totalCost = order.items?.reduce((s, i) => s + (i.cost || 0) * (i.qty || 1), 0) || 0
 
   async function handleDelete() {
-    if (!confirm('確定要刪除這筆訂單紀錄嗎？（庫存數量不會自動回復，請手動調整）')) return
+    // 統計要扣回的庫存品項（非開盒）
+    const inventoryItems = (order.items || []).filter(i => !i.isOpenBox)
+    const openBoxItems = (order.items || []).filter(i => i.isOpenBox)
+
+    const lines = inventoryItems.map(i => `・${i.name} ×${i.qty}`).join('\n')
+    const openBoxNote = openBoxItems.length > 0
+      ? `\n\n開盒遊戲 ${openBoxItems.length} 款不會異動（已寫入 Google Sheet）。`
+      : ''
+
+    const msg = inventoryItems.length > 0
+      ? `刪除後將自動扣回以下庫存：\n${lines}${openBoxNote}\n\n確定刪除？`
+      : `此訂單全為開盒遊戲，刪除只移除訂單紀錄。${openBoxNote}\n\n確定刪除？`
+
+    if (!confirm(msg)) return
     setDeleting(true)
-    await deleteDoc(doc(db, 'orders', id))
-    navigate('/orders')
+
+    try {
+      // 扣回庫存
+      if (inventoryItems.length > 0) {
+        const batch = writeBatch(db)
+        for (const item of inventoryItems) {
+          const snap = await getDocs(
+            query(collection(db, 'inventory'), where('name', '==', item.name))
+          )
+          if (!snap.empty) {
+            batch.update(snap.docs[0].ref, { stock: increment(-(item.qty || 1)) })
+          }
+        }
+        await batch.commit()
+      }
+
+      await deleteDoc(doc(db, 'orders', id))
+      navigate('/orders')
+    } catch (err) {
+      alert('刪除失敗：' + err.message)
+      setDeleting(false)
+    }
   }
 
   return (
