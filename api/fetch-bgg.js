@@ -7,6 +7,7 @@ export default async function handler(req, res) {
   }
 
   const apiKey = process.env.FIRECRAWL_API_KEY
+  console.log('fetch-bgg: apiKey present:', !!apiKey, 'url:', url?.slice(0, 50))
   if (!apiKey) return res.status(500).json({ error: '伺服器設定錯誤，請聯絡管理員' })
 
   try {
@@ -65,7 +66,8 @@ export default async function handler(req, res) {
       complexity: ext.complexity ?? null,
     })
   } catch (e) {
-    console.error('fetch-bgg error:', e?.name, e?.message, e?.stack)
-    return res.status(500).json({ error: '伺服器錯誤，請稍後再試' })
+    const msg = `${e?.name}: ${e?.message}`
+    console.error('fetch-bgg error:', msg)
+    return res.status(500).json({ error: msg })
   }
 }
