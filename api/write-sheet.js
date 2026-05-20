@@ -30,14 +30,16 @@ export default async function handler(req, res) {
       return row
     })
 
-    await sheets.spreadsheets.values.append({
+    const appendRes = await sheets.spreadsheets.values.append({
       spreadsheetId,
       range: `${sheetTitle}!A:Y`,
       valueInputOption: 'USER_ENTERED',
       requestBody: { values: rows },
     })
 
-    res.status(200).json({ ok: true, added: games.length })
+    const updatedRange = appendRes.data.updates?.updatedRange ?? '不明'
+    console.log(`write-sheet: 寫入 ${games.length} 筆到 ${sheetTitle} | 範圍: ${updatedRange}`)
+    res.status(200).json({ ok: true, added: games.length, range: updatedRange })
   } catch (err) {
     console.error('write-sheet error', err)
     res.status(500).json({ error: err.message })
