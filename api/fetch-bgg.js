@@ -65,7 +65,7 @@ export default async function handler(req, res) {
       complexity: ext.complexity ?? null,
     })
   } catch (e) {
-    console.error('fetch-bgg error:', e)
+    console.error('fetch-bgg error:', e?.name, e?.message, e?.stack)
     return res.status(500).json({ error: '伺服器錯誤，請稍後再試' })
   }
 }
