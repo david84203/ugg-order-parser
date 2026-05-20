@@ -23,6 +23,7 @@ const EXTRA_FIELDS = [
   { key: 'tag2',        label: '標籤 2',   placeholder: '' },
   { key: 'tag3',        label: '標籤 3',   placeholder: '' },
   { key: 'youtubeLink', label: '教學連結', placeholder: 'YouTube 網址', span2: true },
+  { key: 'source',     label: '來源',     placeholder: '例：XIAN在玩桌遊', span2: true },
 ]
 
 export default function OpenBoxFormModal({ item, onSave, onCancel }) {

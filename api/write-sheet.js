@@ -49,7 +49,8 @@ export default async function handler(req, res) {
       row[19] = g.sticker || ''
       row[20] = g.imageUrl || ''
       row[21] = g.youtubeLink || ''
-      row[25] = today  // Z: 到貨日
+      row[22] = g.source || ''     // W: 出處
+      row[25] = today              // Z: 到貨日
       return row
     })
 

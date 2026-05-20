@@ -219,6 +219,7 @@ export default function NewOrder() {
             sticker: openBoxData?.sticker || '',
             imageUrl: openBoxData?.imageUrl || '',
             youtubeLink: openBoxData?.youtubeLink || '',
+            source: openBoxData?.source || '',
             rental: openBoxData?.rental || '',
             englishName: openBoxData?.englishName || '',
           }))),
