@@ -1,7 +1,9 @@
 import { useEffect, useState } from 'react'
-import { useParams, useNavigate, Link } from 'react-router-dom'
-import { ArrowLeft, ExternalLink } from 'lucide-react'
+import { useParams, useNavigate } from 'react-router-dom'
+import { ArrowLeft, Trash2 } from 'lucide-react'
 import { useOrders } from '../hooks/useOrders'
+import { db } from '../firebase/config'
+import { deleteDoc, doc } from 'firebase/firestore'
 
 export default function OrderDetail() {
   const { id } = useParams()
@@ -9,6 +11,7 @@ export default function OrderDetail() {
   const { getOrder } = useOrders()
   const [order, setOrder] = useState(null)
   const [loading, setLoading] = useState(true)
+  const [deleting, setDeleting] = useState(false)
 
   useEffect(() => {
     getOrder(id).then(o => { setOrder(o); setLoading(false) })
@@ -18,6 +21,13 @@ export default function OrderDetail() {
   if (!order) return <div className="min-h-screen bg-gray-50 flex items-center justify-center text-gray-400">找不到訂單</div>
 
   const totalCost = order.items?.reduce((s, i) => s + (i.cost || 0) * (i.qty || 1), 0) || 0
+
+  async function handleDelete() {
+    if (!confirm('確定要刪除這筆訂單紀錄嗎？（庫存數量不會自動回復，請手動調整）')) return
+    setDeleting(true)
+    await deleteDoc(doc(db, 'orders', id))
+    navigate('/orders')
+  }
 
   return (
     <div className="min-h-screen bg-gray-50">
@@ -36,11 +46,21 @@ export default function OrderDetail() {
               <h1 className="text-lg font-bold text-gray-800">{order.supplierName || '未指定廠商'}</h1>
               <p className="text-sm text-gray-400 mt-0.5">訂貨日期：{order.orderDate}</p>
             </div>
-            <span className={`text-xs px-2 py-1 rounded-full ${
-              order.synced ? 'bg-green-50 text-green-600' : 'bg-yellow-50 text-yellow-600'
-            }`}>
-              {order.synced ? '已匯入倉儲' : '待確認'}
-            </span>
+            <div className="flex items-center gap-2">
+              <span className={`text-xs px-2 py-1 rounded-full ${
+                order.synced ? 'bg-green-50 text-green-600' : 'bg-yellow-50 text-yellow-600'
+              }`}>
+                {order.synced ? '已匯入倉儲' : '待確認'}
+              </span>
+              <button
+                onClick={handleDelete}
+                disabled={deleting}
+                className="flex items-center gap-1 text-xs text-gray-400 hover:text-red-500 transition px-2 py-1 rounded-lg hover:bg-red-50"
+              >
+                <Trash2 size={13} />
+                刪除
+              </button>
+            </div>
           </div>
           <div className="mt-4 grid grid-cols-3 gap-4 text-center pt-4 border-t border-gray-100">
             <div>
