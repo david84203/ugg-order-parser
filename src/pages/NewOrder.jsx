@@ -5,11 +5,9 @@ import * as XLSX from 'xlsx'
 import { useSuppliers } from '../hooks/useSuppliers'
 import { useOrders } from '../hooks/useOrders'
 import { db } from '../firebase/config'
-import {
-  collection, getDocs, query, where, addDoc, updateDoc, doc, increment
-} from 'firebase/firestore'
+import { collection, getDocs, query, where, addDoc, updateDoc, doc, increment } from 'firebase/firestore'
+import { parseOrderText } from '../utils/orderParser'
 
-// 嘗試自動識別 Excel 欄位
 function detectColumn(headers, keywords) {
   return headers.findIndex(h =>
     keywords.some(k => String(h).toLowerCase().includes(k.toLowerCase()))
@@ -29,7 +27,7 @@ function parseExcel(file) {
         const headers = rows[0].map(String)
         const nameIdx = detectColumn(headers, ['名稱', 'name', '品名', '遊戲', '商品'])
         const priceIdx = detectColumn(headers, ['定價', '售價', 'price', '原價'])
-        const costIdx = detectColumn(headers, ['進價', '成本', 'cost', '進貨'])
+        const costIdx = detectColumn(headers, ['進價', '成本', 'cost', '進貨', '單價', '金額'])
         const qtyIdx = detectColumn(headers, ['數量', 'qty', 'quantity', '訂購'])
 
         const items = rows.slice(1).filter(r => r[nameIdx]).map(r => ({
@@ -37,6 +35,7 @@ function parseExcel(file) {
           price: Number(r[priceIdx]) || 0,
           cost: Number(r[costIdx]) || 0,
           qty: Number(r[qtyIdx]) || 1,
+          isOpenBox: false,
         })).filter(i => i.name)
 
         resolve(items)
@@ -46,42 +45,6 @@ function parseExcel(file) {
     }
     reader.readAsArrayBuffer(file)
   })
-}
-
-async function parseText(text) {
-  const apiKey = import.meta.env.VITE_ANTHROPIC_API_KEY
-  if (!apiKey) throw new Error('未設定 ANTHROPIC_API_KEY')
-
-  const res = await fetch('https://api.anthropic.com/v1/messages', {
-    method: 'POST',
-    headers: {
-      'Content-Type': 'application/json',
-      'x-api-key': apiKey,
-      'anthropic-version': '2023-06-01',
-      'anthropic-dangerous-direct-browser-access': 'true',
-    },
-    body: JSON.stringify({
-      model: 'claude-haiku-4-5-20251001',
-      max_tokens: 2048,
-      messages: [{
-        role: 'user',
-        content: `請從以下訂單文字中擷取遊戲清單，回傳 JSON 陣列，格式如下（只回傳 JSON，不要其他說明）：
-[{"name":"遊戲名稱","price":定價數字,"cost":進價數字,"qty":數量數字}]
-
-若某欄位找不到資訊，price/cost 填 0，qty 填 1。
-
-訂單文字：
-${text}`,
-      }],
-    }),
-  })
-
-  if (!res.ok) throw new Error(`API 錯誤: ${res.status}`)
-  const data = await res.json()
-  const content = data.content[0].text.trim()
-  const jsonStr = content.match(/\[[\s\S]*\]/)?.[0]
-  if (!jsonStr) throw new Error('無法解析回傳內容')
-  return JSON.parse(jsonStr)
 }
 
 async function syncToInventory(items) {
@@ -112,7 +75,7 @@ async function syncToInventory(items) {
         })
         results.updated++
       }
-    } catch (err) {
+    } catch {
       results.errors.push(item.name)
     }
   }
@@ -129,10 +92,12 @@ export default function NewOrder() {
   const initSupplierId = searchParams.get('supplierId') || ''
   const initSupplierName = searchParams.get('supplierName') || ''
 
-  const [step, setStep] = useState(1) // 1:上傳 2:確認 3:完成
+  const [inputTab, setInputTab] = useState('text') // 'text' | 'file'
+  const [step, setStep] = useState(1)
   const [supplierId, setSupplierId] = useState(initSupplierId)
   const [supplierName, setSupplierName] = useState(initSupplierName)
   const [orderDate, setOrderDate] = useState(new Date().toISOString().slice(0, 10))
+  const [rawText, setRawText] = useState('')
   const [items, setItems] = useState([])
   const [parsing, setParsing] = useState(false)
   const [parseError, setParseError] = useState('')
@@ -142,19 +107,26 @@ export default function NewOrder() {
 
   const selectedSupplier = suppliers.find(s => s.id === supplierId)
 
+  function handleTextParse() {
+    setParseError('')
+    const parsed = parseOrderText(rawText)
+    if (!parsed.length) {
+      setParseError('找不到可解析的品項，請確認格式是否正確（玩坊格式）。')
+      return
+    }
+    // 玩坊格式：msrp → price, unitCost → cost
+    setItems(parsed.map(i => ({ name: i.name, price: i.msrp, cost: i.unitCost, qty: i.qty, isOpenBox: false })))
+    setFileName('玩坊文字訂單')
+    setStep(2)
+  }
+
   async function handleFile(file) {
     if (!file) return
     setFileName(file.name)
     setParsing(true)
     setParseError('')
     try {
-      let parsed
-      if (file.name.match(/\.(xlsx|xls)$/i)) {
-        parsed = await parseExcel(file)
-      } else {
-        const text = await file.text()
-        parsed = await parseText(text)
-      }
+      const parsed = await parseExcel(file)
       if (!parsed.length) throw new Error('解析結果為空，請確認檔案格式')
       setItems(parsed)
       setStep(2)
@@ -171,42 +143,78 @@ export default function NewOrder() {
     ))
   }
 
+  function toggleOpenBox(idx) {
+    setItems(prev => prev.map((item, i) =>
+      i === idx ? { ...item, isOpenBox: !item.isOpenBox } : item
+    ))
+  }
+
   function removeItem(idx) {
     setItems(prev => prev.filter((_, i) => i !== idx))
   }
 
   function addBlankItem() {
-    setItems(prev => [...prev, { name: '', price: 0, cost: 0, qty: 1 }])
+    setItems(prev => [...prev, { name: '', price: 0, cost: 0, qty: 1, isOpenBox: false }])
   }
 
-  const totalAmount = items.reduce((s, i) => s + (i.cost || 0) * (i.qty || 1), 0)
+  const inventoryItems = items.filter(i => !i.isOpenBox)
+  const openBoxItems = items.filter(i => i.isOpenBox)
+  const inventoryCost = inventoryItems.reduce((s, i) => s + (i.cost || 0) * (i.qty || 1), 0)
+  const openBoxCost = openBoxItems.reduce((s, i) => s + (i.cost || 0) * (i.qty || 1), 0)
+  const totalAmount = inventoryCost + openBoxCost
 
   async function handleConfirm() {
-    if (!items.length) return
+    if (!items.filter(i => i.name).length) return
     setSyncing(true)
+    setParseError('')
     try {
-      const result = await syncToInventory(items)
-      const orderId = await addOrder({
+      // 非開盒 → 庫存
+      let result = { added: 0, updated: 0, errors: [] }
+      if (inventoryItems.length > 0) {
+        result = await syncToInventory(inventoryItems)
+      }
+
+      // 開盒 → Google Sheet
+      if (openBoxItems.length > 0) {
+        const res = await fetch('/api/write-sheet', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(openBoxItems.map(({ name, price }) => ({ name, msrp: price }))),
+        })
+        if (!res.ok) throw new Error('Google Sheet 寫入失敗')
+      }
+
+      await addOrder({
         supplierId: supplierId || '',
         supplierName: supplierName || selectedSupplier?.name || '',
         orderDate,
         items,
         totalAmount,
+        inventoryCost,
+        openBoxCost,
+        openBoxCount: openBoxItems.length,
         synced: true,
       })
 
-      // 更新廠商的最後訂貨日
       if (supplierId) {
         await updateDoc(doc(db, 'suppliers', supplierId), { lastOrderDate: orderDate })
       }
 
-      setSyncResult(result)
+      setSyncResult({ ...result, openBoxAdded: openBoxItems.length })
       setStep(3)
     } catch (err) {
       setParseError(err.message)
     } finally {
       setSyncing(false)
     }
+  }
+
+  function resetStep1() {
+    setStep(1)
+    setItems([])
+    setFileName('')
+    setRawText('')
+    setParseError('')
   }
 
   return (
@@ -222,9 +230,10 @@ export default function NewOrder() {
 
         <h1 className="text-xl font-bold text-gray-800 mb-6">新增訂單</h1>
 
-        {/* Step 1：上傳 */}
+        {/* Step 1：輸入 */}
         {step === 1 && (
           <div className="space-y-5">
+            {/* 訂單資訊 */}
             <div className="bg-white rounded-2xl border border-gray-100 shadow-sm p-5">
               <h2 className="font-semibold text-gray-700 mb-4">訂單資訊</h2>
               <div className="grid grid-cols-2 gap-4">
@@ -257,35 +266,81 @@ export default function NewOrder() {
               </div>
             </div>
 
+            {/* 輸入方式切換 */}
             <div className="bg-white rounded-2xl border border-gray-100 shadow-sm p-5">
-              <h2 className="font-semibold text-gray-700 mb-4">上傳訂單檔案</h2>
-              <div
-                onClick={() => fileRef.current.click()}
-                className="border-2 border-dashed border-gray-200 rounded-xl p-10 text-center cursor-pointer hover:border-orange-300 hover:bg-orange-50 transition"
-              >
-                {parsing ? (
-                  <div className="text-gray-500">
-                    <div className="animate-spin text-3xl mb-2">⏳</div>
-                    <p className="text-sm">解析中...</p>
-                  </div>
-                ) : (
-                  <>
-                    <div className="flex justify-center gap-4 mb-3">
-                      <FileSpreadsheet size={32} className="text-green-400" />
-                      <FileText size={32} className="text-blue-400" />
-                    </div>
-                    <p className="text-sm font-medium text-gray-600">點擊選擇或拖放檔案</p>
-                    <p className="text-xs text-gray-400 mt-1">支援 .xlsx、.xls、.txt、.csv</p>
-                  </>
-                )}
+              <div className="flex gap-2 mb-4">
+                <button
+                  onClick={() => { setInputTab('text'); setParseError('') }}
+                  className={`flex items-center gap-2 px-4 py-2 rounded-xl text-sm font-medium transition ${
+                    inputTab === 'text'
+                      ? 'bg-orange-50 text-orange-600 border border-orange-200'
+                      : 'text-gray-500 border border-gray-200 hover:bg-gray-50'
+                  }`}
+                >
+                  <FileText size={14} /> 文字貼上
+                  <span className="text-xs text-gray-400">（玩坊）</span>
+                </button>
+                <button
+                  onClick={() => { setInputTab('file'); setParseError('') }}
+                  className={`flex items-center gap-2 px-4 py-2 rounded-xl text-sm font-medium transition ${
+                    inputTab === 'file'
+                      ? 'bg-orange-50 text-orange-600 border border-orange-200'
+                      : 'text-gray-500 border border-gray-200 hover:bg-gray-50'
+                  }`}
+                >
+                  <Upload size={14} /> Excel 上傳
+                  <span className="text-xs text-gray-400">（其他廠商）</span>
+                </button>
               </div>
+
+              {inputTab === 'text' && (
+                <>
+                  <textarea
+                    className="w-full h-48 text-sm text-gray-700 border border-gray-200 rounded-xl p-3 resize-none focus:outline-none focus:border-orange-400"
+                    placeholder="貼上玩坊訂單文字…"
+                    value={rawText}
+                    onChange={e => { setRawText(e.target.value); setParseError('') }}
+                  />
+                  <button
+                    onClick={handleTextParse}
+                    disabled={!rawText.trim()}
+                    className="mt-3 px-5 py-2 bg-orange-500 text-white text-sm font-medium rounded-xl hover:bg-orange-600 disabled:opacity-40 disabled:cursor-not-allowed transition"
+                  >
+                    解析訂單
+                  </button>
+                </>
+              )}
+
+              {inputTab === 'file' && (
+                <div
+                  onClick={() => fileRef.current.click()}
+                  className="border-2 border-dashed border-gray-200 rounded-xl p-10 text-center cursor-pointer hover:border-orange-300 hover:bg-orange-50 transition"
+                >
+                  {parsing ? (
+                    <div className="text-gray-500">
+                      <div className="animate-spin text-3xl mb-2">⏳</div>
+                      <p className="text-sm">解析中...</p>
+                    </div>
+                  ) : (
+                    <>
+                      <div className="flex justify-center gap-4 mb-3">
+                        <FileSpreadsheet size={32} className="text-green-400" />
+                      </div>
+                      <p className="text-sm font-medium text-gray-600">點擊選擇或拖放檔案</p>
+                      <p className="text-xs text-gray-400 mt-1">支援 .xlsx、.xls</p>
+                    </>
+                  )}
+                </div>
+              )}
+
               <input
                 ref={fileRef}
                 type="file"
-                accept=".xlsx,.xls,.txt,.csv"
+                accept=".xlsx,.xls"
                 className="hidden"
                 onChange={e => handleFile(e.target.files[0])}
               />
+
               {parseError && (
                 <div className="mt-3 flex items-center gap-2 text-sm text-red-500">
                   <AlertCircle size={15} />
@@ -307,20 +362,21 @@ export default function NewOrder() {
                 </div>
                 <span className="text-xs text-gray-400">{fileName}</span>
               </div>
-              <div className="text-xs text-gray-400">共 {items.length} 款，進貨總額 NT${totalAmount.toLocaleString()}</div>
+              <div className="text-xs text-gray-400">共 {items.length} 款</div>
             </div>
 
             <div className="bg-white rounded-2xl border border-gray-100 shadow-sm overflow-hidden">
               <div className="grid grid-cols-12 text-xs font-medium text-gray-400 bg-gray-50 px-4 py-2 border-b border-gray-100">
-                <div className="col-span-5">遊戲名稱</div>
+                <div className="col-span-4">遊戲名稱</div>
                 <div className="col-span-2 text-right">定價</div>
                 <div className="col-span-2 text-right">進價</div>
-                <div className="col-span-2 text-right">數量</div>
+                <div className="col-span-1 text-right">數量</div>
+                <div className="col-span-2 text-center">開盒遊戲<br/><span className="text-gray-300 normal-case font-normal">→寫入 Sheet</span></div>
                 <div className="col-span-1"></div>
               </div>
               {items.map((item, idx) => (
-                <div key={idx} className="grid grid-cols-12 items-center px-4 py-2 border-b border-gray-50 hover:bg-gray-50 transition">
-                  <div className="col-span-5 pr-2">
+                <div key={idx} className={`grid grid-cols-12 items-center px-4 py-2 border-b border-gray-50 transition ${item.isOpenBox ? 'bg-orange-50' : 'hover:bg-gray-50'}`}>
+                  <div className="col-span-4 pr-2">
                     <input
                       className="w-full text-sm text-gray-800 bg-transparent border-b border-transparent hover:border-gray-200 focus:border-orange-400 focus:outline-none py-0.5"
                       value={item.name}
@@ -328,7 +384,7 @@ export default function NewOrder() {
                     />
                   </div>
                   {['price', 'cost', 'qty'].map(key => (
-                    <div key={key} className="col-span-2 pr-2">
+                    <div key={key} className="col-span-2 pr-2 last:col-span-1">
                       <input
                         type="number"
                         min="0"
@@ -338,23 +394,34 @@ export default function NewOrder() {
                       />
                     </div>
                   ))}
+                  <div className="col-span-2 text-center">
+                    <input
+                      type="checkbox"
+                      checked={item.isOpenBox}
+                      onChange={() => toggleOpenBox(idx)}
+                      className="w-4 h-4 accent-orange-500"
+                    />
+                  </div>
                   <div className="col-span-1 text-right">
-                    <button
-                      onClick={() => removeItem(idx)}
-                      className="p-1 text-gray-300 hover:text-red-400 transition"
-                    >
+                    <button onClick={() => removeItem(idx)} className="p-1 text-gray-300 hover:text-red-400 transition">
                       <Trash2 size={13} />
                     </button>
                   </div>
                 </div>
               ))}
               <div className="px-4 py-2">
-                <button
-                  onClick={addBlankItem}
-                  className="text-xs text-orange-500 hover:text-orange-600 transition"
-                >
+                <button onClick={addBlankItem} className="text-xs text-orange-500 hover:text-orange-600 transition">
                   + 新增一行
                 </button>
+              </div>
+            </div>
+
+            {/* 成本摘要 */}
+            <div className="bg-white rounded-2xl border border-gray-100 shadow-sm px-5 py-3">
+              <div className="flex gap-6 text-xs text-gray-500">
+                <span>庫存 <strong className="text-gray-700">{inventoryItems.length}</strong> 筆・NT$<strong className="text-gray-700">{inventoryCost.toLocaleString()}</strong></span>
+                <span>開盒 <strong className="text-orange-600">{openBoxItems.length}</strong> 筆・NT$<strong className="text-orange-600">{openBoxCost.toLocaleString()}</strong></span>
+                <span className="text-gray-400">合計 NT$<strong>{totalAmount.toLocaleString()}</strong></span>
               </div>
             </div>
 
@@ -366,18 +433,15 @@ export default function NewOrder() {
             )}
 
             <div className="flex gap-3">
-              <button
-                onClick={() => { setStep(1); setItems([]); setFileName('') }}
-                className="flex-1 py-2.5 rounded-xl border border-gray-200 text-sm text-gray-500 hover:bg-gray-50 transition"
-              >
-                重新上傳
+              <button onClick={resetStep1} className="flex-1 py-2.5 rounded-xl border border-gray-200 text-sm text-gray-500 hover:bg-gray-50 transition">
+                重新輸入
               </button>
               <button
                 onClick={handleConfirm}
                 disabled={syncing || !items.filter(i => i.name).length}
                 className="flex-1 py-2.5 rounded-xl bg-orange-500 text-white text-sm font-medium hover:bg-orange-600 transition disabled:opacity-50"
               >
-                {syncing ? '匯入中...' : '確認並匯入倉儲'}
+                {syncing ? '匯入中...' : '確認並匯入'}
               </button>
             </div>
           </div>
@@ -391,23 +455,19 @@ export default function NewOrder() {
             </div>
             <h2 className="text-lg font-bold text-gray-800 mb-2">匯入完成！</h2>
             <div className="text-sm text-gray-500 space-y-1">
-              <p>新增 <span className="font-semibold text-gray-700">{syncResult.added}</span> 款遊戲</p>
-              <p>更新 <span className="font-semibold text-gray-700">{syncResult.updated}</span> 款庫存</p>
+              <p>庫存新增 <strong className="text-gray-700">{syncResult.added}</strong> 款・更新 <strong className="text-gray-700">{syncResult.updated}</strong> 款</p>
+              {syncResult.openBoxAdded > 0 && (
+                <p>開盒遊戲 <strong className="text-orange-600">{syncResult.openBoxAdded}</strong> 款已寫入 Google Sheet</p>
+              )}
               {syncResult.errors.length > 0 && (
                 <p className="text-red-500">失敗 {syncResult.errors.length} 款：{syncResult.errors.join('、')}</p>
               )}
             </div>
             <div className="flex gap-3 mt-6">
-              <button
-                onClick={() => navigate('/orders')}
-                className="flex-1 py-2.5 rounded-xl border border-gray-200 text-sm text-gray-500 hover:bg-gray-50 transition"
-              >
+              <button onClick={() => navigate('/orders')} className="flex-1 py-2.5 rounded-xl border border-gray-200 text-sm text-gray-500 hover:bg-gray-50 transition">
                 查看歷史訂單
               </button>
-              <button
-                onClick={() => navigate('/inventory')}
-                className="flex-1 py-2.5 rounded-xl bg-orange-500 text-white text-sm font-medium hover:bg-orange-600 transition"
-              >
+              <button onClick={() => navigate('/inventory')} className="flex-1 py-2.5 rounded-xl bg-orange-500 text-white text-sm font-medium hover:bg-orange-600 transition">
                 查看倉儲
               </button>
             </div>
