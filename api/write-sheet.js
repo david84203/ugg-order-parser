@@ -27,6 +27,11 @@ export default async function handler(req, res) {
     // F(5)=放置櫃位, K(10)=BGG連結, N(13)=定價, O(14)=租金
     // P(15)=分類, Q(16)=標籤1, R(17)=標籤2, S(18)=標籤3
     // T(19)=貼紙, U(20)=圖片, V(21)=教學
+    const today = new Date().toLocaleDateString('zh-TW', {
+      timeZone: 'Asia/Taipei',
+      year: 'numeric', month: '2-digit', day: '2-digit',
+    }).replace(/\//g, '-')
+
     const rows = games.map(g => {
       const row = Array(26).fill('')
       row[0]  = g.name || ''
@@ -44,6 +49,7 @@ export default async function handler(req, res) {
       row[19] = g.sticker || ''
       row[20] = g.imageUrl || ''
       row[21] = g.youtubeLink || ''
+      row[25] = today  // Z: 到貨日
       return row
     })
 
