@@ -22,17 +22,34 @@ export default async function handler(req, res) {
     const sheet = meta.data.sheets.find(s => s.properties.sheetId === 540615026)
     const sheetTitle = sheet?.properties?.title ?? meta.data.sheets[0].properties.title
 
-    // 建立每列資料：A-Y 共 25 欄，A=品名、N=定價
-    const rows = games.map(({ name, msrp }) => {
-      const row = Array(25).fill('')
-      row[0] = name        // A: 中文名稱
-      row[13] = msrp || '' // N: 定價
+    // 欄位對應（與 ugg-inventory add-rental-game.js 一致）：
+    // A(0)=中文名稱, B(1)=英文名稱, D(3)=語言版本, E(4)=遊戲人數
+    // F(5)=放置櫃位, K(10)=BGG連結, N(13)=定價, O(14)=租金
+    // P(15)=分類, Q(16)=標籤1, R(17)=標籤2, S(18)=標籤3
+    // T(19)=貼紙, U(20)=圖片, V(21)=教學
+    const rows = games.map(g => {
+      const row = Array(26).fill('')
+      row[0]  = g.name || ''
+      row[1]  = g.englishName || ''
+      row[3]  = g.lang || ''
+      row[4]  = g.players || ''
+      row[5]  = g.location || ''
+      row[10] = g.bggUrl || ''
+      row[13] = g.msrp || g.price || ''
+      row[14] = g.rental || ''
+      row[15] = g.category || ''
+      row[16] = g.tag1 || ''
+      row[17] = g.tag2 || ''
+      row[18] = g.tag3 || ''
+      row[19] = g.sticker || ''
+      row[20] = g.imageUrl || ''
+      row[21] = g.youtubeLink || ''
       return row
     })
 
     const appendRes = await sheets.spreadsheets.values.append({
       spreadsheetId,
-      range: `${sheetTitle}!A:Y`,
+      range: `${sheetTitle}!A:Z`,
       valueInputOption: 'USER_ENTERED',
       requestBody: { values: rows },
     })

@@ -1,6 +1,7 @@
 import { useState, useRef } from 'react'
 import { useNavigate, useSearchParams } from 'react-router-dom'
 import { ArrowLeft, Upload, FileSpreadsheet, FileText, Trash2, Check, AlertCircle } from 'lucide-react'
+import OpenBoxFormModal from '../components/OpenBoxFormModal'
 import * as XLSX from 'xlsx'
 import { useSuppliers } from '../hooks/useSuppliers'
 import { useOrders } from '../hooks/useOrders'
@@ -104,6 +105,7 @@ export default function NewOrder() {
   const [fileName, setFileName] = useState('')
   const [syncing, setSyncing] = useState(false)
   const [syncResult, setSyncResult] = useState(null)
+  const [openBoxModal, setOpenBoxModal] = useState({ open: false, itemIdx: null })
 
   const selectedSupplier = suppliers.find(s => s.id === supplierId)
 
@@ -144,9 +146,27 @@ export default function NewOrder() {
   }
 
   function toggleOpenBox(idx) {
-    setItems(prev => prev.map((item, i) =>
-      i === idx ? { ...item, isOpenBox: !item.isOpenBox } : item
-    ))
+    const item = items[idx]
+    if (!item.isOpenBox) {
+      // 勾選：先標記，然後開 Modal 填資料
+      setItems(prev => prev.map((it, i) => i === idx ? { ...it, isOpenBox: true } : it))
+      setOpenBoxModal({ open: true, itemIdx: idx })
+    } else {
+      // 取消勾選：清掉 openBoxData
+      setItems(prev => prev.map((it, i) => i === idx ? { ...it, isOpenBox: false, openBoxData: null } : it))
+    }
+  }
+
+  function handleOpenBoxSave(formData) {
+    const idx = openBoxModal.itemIdx
+    setItems(prev => prev.map((it, i) => i === idx ? { ...it, openBoxData: formData } : it))
+    setOpenBoxModal({ open: false, itemIdx: null })
+  }
+
+  function handleOpenBoxCancel() {
+    const idx = openBoxModal.itemIdx
+    setItems(prev => prev.map((it, i) => i === idx ? { ...it, isOpenBox: false, openBoxData: null } : it))
+    setOpenBoxModal({ open: false, itemIdx: null })
   }
 
   function removeItem(idx) {
@@ -180,12 +200,28 @@ export default function NewOrder() {
         result = await syncToInventory(inventorySyncItems)
       }
 
-      // 開盒 → Google Sheet（每款只寫 1 盒，不管 qty 多少）
+      // 開盒 → Google Sheet（每款只寫 1 盒，帶入 Modal 填入的完整資料）
       if (openBoxItems.length > 0) {
         const res = await fetch('/api/write-sheet', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify(openBoxItems.map(({ name, price }) => ({ name, msrp: price }))),
+          body: JSON.stringify(openBoxItems.map(({ name, price, openBoxData }) => ({
+            name,
+            msrp: openBoxData?.price || price,
+            players: openBoxData?.players || '',
+            lang: openBoxData?.lang || '',
+            location: openBoxData?.location || '',
+            bggUrl: openBoxData?.bggUrl || '',
+            category: openBoxData?.category || '',
+            tag1: openBoxData?.tag1 || '',
+            tag2: openBoxData?.tag2 || '',
+            tag3: openBoxData?.tag3 || '',
+            sticker: openBoxData?.sticker || '',
+            imageUrl: openBoxData?.imageUrl || '',
+            youtubeLink: openBoxData?.youtubeLink || '',
+            rental: openBoxData?.rental || '',
+            englishName: openBoxData?.englishName || '',
+          }))),
         })
         if (!res.ok) throw new Error('Google Sheet 寫入失敗')
       }
@@ -225,6 +261,13 @@ export default function NewOrder() {
 
   return (
     <div className="min-h-screen bg-gray-50">
+      {openBoxModal.open && openBoxModal.itemIdx !== null && (
+        <OpenBoxFormModal
+          item={items[openBoxModal.itemIdx]}
+          onSave={handleOpenBoxSave}
+          onCancel={handleOpenBoxCancel}
+        />
+      )}
       <div className="p-6 max-w-3xl mx-auto">
         <button
           onClick={() => navigate(-1)}
