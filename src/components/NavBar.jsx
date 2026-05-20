@@ -3,7 +3,7 @@ import { Building2, ClipboardList, Package } from 'lucide-react'
 
 const links = [
   { to: '/suppliers', icon: Building2, label: '廠商管理' },
-  { to: '/orders', icon: ClipboardList, label: '歷史訂單' },
+  { to: '/orders', icon: ClipboardList, label: '訂單管理' },
   { to: '/inventory', icon: Package, label: '倉儲同步' },
 ]
 
