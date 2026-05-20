@@ -11,7 +11,6 @@ function calcRental(price) {
 const emptyExtra = {
   players: '', lang: '', location: '', bggUrl: '',
   category: '', tag1: '', tag2: '', tag3: '', sticker: '', youtubeLink: '',
-  discountType: 'rate', discountRate: 65,
   englishName: '', bggRating: '', bestPlayers: '', playTime: '', complexity: '',
 }
 
@@ -27,7 +26,7 @@ const EXTRA_FIELDS = [
 ]
 
 export default function OpenBoxFormModal({ item, onSave, onCancel }) {
-  const [form, setForm] = useState({ ...emptyExtra, price: item.price || '' })
+  const [form, setForm] = useState({ ...emptyExtra, price: item.price || '', cost: item.cost || '' })
   const [bggInput, setBggInput] = useState('')
   const [bggData, setBggData] = useState(null)
   const [fetching, setFetching] = useState(false)
@@ -40,9 +39,8 @@ export default function OpenBoxFormModal({ item, onSave, onCancel }) {
   const fileRef = useRef()
 
   const price = Number(form.price) || 0
-  const isFree = form.discountType === 'free'
+  const cost = Number(form.cost) || 0
   const rental = calcRental(price)
-  const cost = isFree ? 0 : (price > 0 ? Math.round(price * form.discountRate / 100) : 0)
 
   function set(key, value) {
     setForm(f => ({ ...f, [key]: value }))
@@ -104,7 +102,7 @@ export default function OpenBoxFormModal({ item, onSave, onCancel }) {
         await uploadBytes(storageRef, imageFile)
         imageUrl = await getDownloadURL(storageRef)
       }
-      onSave({ ...form, price: price || item.price || 0, rental, cost, imageUrl })
+      onSave({ ...form, price: price || item.price || 0, cost: cost || item.cost || 0, rental, imageUrl })
     } catch (err) {
       setUploadError('圖片上傳失敗：' + err.message)
     } finally {
@@ -229,29 +227,14 @@ export default function OpenBoxFormModal({ item, onSave, onCancel }) {
                 />
               </div>
               <div>
-                <label className="block text-xs text-gray-500 mb-1">進貨折數</label>
-                <select
-                  className="w-full border border-gray-200 rounded-xl px-2 py-2 text-sm focus:outline-none focus:border-orange-400 bg-white"
-                  value={form.discountType}
-                  onChange={e => set('discountType', e.target.value)}
-                >
-                  <option value="rate">自訂折數</option>
-                  <option value="free">廠商贈送</option>
-                </select>
-                {!isFree && (
-                  <div className="relative mt-1.5">
-                    <input
-                      type="number" min="1" max="100"
-                      className="w-full border border-gray-200 rounded-xl pl-3 pr-7 py-1.5 text-sm focus:outline-none focus:border-orange-400"
-                      value={form.discountRate}
-                      onChange={e => set('discountRate', Number(e.target.value) || 65)}
-                    />
-                    <span className="absolute right-2.5 top-1/2 -translate-y-1/2 text-xs text-gray-400">%</span>
-                  </div>
-                )}
-                <p className="text-xs text-gray-400 mt-1 pl-0.5">
-                  {isFree ? '= NT$ 0（免費）' : `= NT$ ${cost.toLocaleString()}`}
-                </p>
+                <label className="block text-xs text-gray-500 mb-1">進價（NT$）</label>
+                <input
+                  type="number" min="0"
+                  className="w-full border border-gray-200 rounded-xl px-3 py-2 text-sm focus:outline-none focus:border-orange-400"
+                  value={form.cost}
+                  onChange={e => set('cost', e.target.value)}
+                  placeholder="0"
+                />
               </div>
               <div>
                 <label className="block text-xs text-gray-500 mb-1">租金（自動）</label>
