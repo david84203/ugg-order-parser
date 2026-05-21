@@ -28,7 +28,7 @@ const EXTRA_FIELDS = [
   { key: 'source',      label: '來源',     placeholder: '例：XIAN在玩桌遊', span2: true },
 ]
 
-export default function OpenBoxFormModal({ item, onSave, onCancel }) {
+export default function OpenBoxFormModal({ item, itemLabel, hasNext, onSave, onSaveNext, onCancel }) {
   const [form, setForm] = useState({ ...emptyExtra, price: item.price || '', cost: item.cost || '' })
   const [bggInput, setBggInput] = useState('')
   const [bggData, setBggData] = useState(null)
@@ -122,7 +122,10 @@ export default function OpenBoxFormModal({ item, onSave, onCancel }) {
         {/* Header */}
         <div className="flex items-center justify-between px-5 py-4 border-b border-gray-100 flex-shrink-0">
           <div>
-            <h2 className="text-sm font-semibold text-gray-800">開盒遊戲資料</h2>
+            <h2 className="text-sm font-semibold text-gray-800">
+              開盒遊戲資料
+              {itemLabel && <span className="ml-2 text-xs font-normal text-orange-400">{itemLabel}</span>}
+            </h2>
             <p className="text-xs text-gray-400 mt-0.5">{item.name}</p>
           </div>
           <button onClick={onCancel} className="p-1 text-gray-400 hover:text-gray-600 transition">
@@ -298,11 +301,36 @@ export default function OpenBoxFormModal({ item, onSave, onCancel }) {
         </div>
 
         {/* Footer */}
-        <div className="flex gap-3 px-5 py-4 border-t border-gray-100 flex-shrink-0">
+        <div className="flex gap-2 px-5 py-4 border-t border-gray-100 flex-shrink-0">
           <button onClick={onCancel}
-            className="flex-1 py-2.5 rounded-xl border border-gray-200 text-sm text-gray-500 hover:bg-gray-50 transition">
+            className="px-4 py-2.5 rounded-xl border border-gray-200 text-sm text-gray-500 hover:bg-gray-50 transition">
             取消
           </button>
+          {hasNext && onSaveNext && (
+            <button
+              onClick={async () => {
+                setUploading(true)
+                try {
+                  let imageUrl = ''
+                  if (imageFile) {
+                    const ext = imageFile.name.split('.').pop()
+                    const storageRef = ref(storage, `rental-games/${Date.now()}_${item.name}.${ext}`)
+                    await uploadBytes(storageRef, imageFile)
+                    imageUrl = await getDownloadURL(storageRef)
+                  }
+                  onSaveNext({ ...form, price: price || item.price || 0, cost: cost || item.cost || 0, rental, imageUrl })
+                } catch (err) {
+                  setUploadError('圖片上傳失敗：' + err.message)
+                } finally {
+                  setUploading(false)
+                }
+              }}
+              disabled={uploading}
+              className="flex-1 py-2.5 rounded-xl border border-orange-400 text-orange-600 text-sm font-medium hover:bg-orange-50 transition disabled:opacity-50"
+            >
+              儲存並填下一款 →
+            </button>
+          )}
           <button onClick={handleSave} disabled={uploading}
             className="flex-1 py-2.5 rounded-xl bg-orange-500 text-white text-sm font-medium hover:bg-orange-600 transition disabled:opacity-50 flex items-center justify-center gap-2">
             {uploading

@@ -219,13 +219,15 @@ export default function NewOrder() {
   function toggleOpenBox(idx) {
     const item = items[idx]
     if (!item.isOpenBox) {
-      // 勾選：先標記，然後開 Modal 填資料
       setItems(prev => prev.map((it, i) => i === idx ? { ...it, isOpenBox: true } : it))
       setOpenBoxModal({ open: true, itemIdx: idx })
     } else {
-      // 取消勾選：清掉 openBoxData
       setItems(prev => prev.map((it, i) => i === idx ? { ...it, isOpenBox: false, openBoxData: null } : it))
     }
+  }
+
+  function openBoxEdit(idx) {
+    setOpenBoxModal({ open: true, itemIdx: idx })
   }
 
   function handleOpenBoxSave(formData) {
@@ -234,9 +236,21 @@ export default function NewOrder() {
     setOpenBoxModal({ open: false, itemIdx: null })
   }
 
+  function handleOpenBoxSaveNext(formData) {
+    const idx = openBoxModal.itemIdx
+    const updated = items.map((it, i) => i === idx ? { ...it, openBoxData: formData } : it)
+    setItems(updated)
+    const nextIdx = updated.findIndex((it, i) => i > idx && it.isOpenBox && !it.openBoxData)
+    if (nextIdx !== -1) setOpenBoxModal({ open: true, itemIdx: nextIdx })
+    else setOpenBoxModal({ open: false, itemIdx: null })
+  }
+
   function handleOpenBoxCancel() {
     const idx = openBoxModal.itemIdx
-    setItems(prev => prev.map((it, i) => i === idx ? { ...it, isOpenBox: false, openBoxData: null } : it))
+    // 若是新勾選（尚未有 openBoxData）才取消勾選；已有資料的只是關閉
+    if (!items[idx]?.openBoxData) {
+      setItems(prev => prev.map((it, i) => i === idx ? { ...it, isOpenBox: false, openBoxData: null } : it))
+    }
     setOpenBoxModal({ open: false, itemIdx: null })
   }
 
@@ -338,13 +352,22 @@ export default function NewOrder() {
 
   return (
     <div className="min-h-screen bg-gray-50">
-      {openBoxModal.open && openBoxModal.itemIdx !== null && (
-        <OpenBoxFormModal
-          item={items[openBoxModal.itemIdx]}
-          onSave={handleOpenBoxSave}
-          onCancel={handleOpenBoxCancel}
-        />
-      )}
+      {openBoxModal.open && openBoxModal.itemIdx !== null && (() => {
+        const allOpenBoxIdxs = items.reduce((acc, it, i) => it.isOpenBox ? [...acc, i] : acc, [])
+        const currentNum = allOpenBoxIdxs.indexOf(openBoxModal.itemIdx) + 1
+        const totalNum = allOpenBoxIdxs.length
+        const hasNext = items.findIndex((it, i) => i > openBoxModal.itemIdx && it.isOpenBox && !it.openBoxData) !== -1
+        return (
+          <OpenBoxFormModal
+            item={items[openBoxModal.itemIdx]}
+            itemLabel={totalNum > 1 ? `第 ${currentNum} / ${totalNum} 款` : ''}
+            hasNext={hasNext}
+            onSave={handleOpenBoxSave}
+            onSaveNext={handleOpenBoxSaveNext}
+            onCancel={handleOpenBoxCancel}
+          />
+        )
+      })()}
       <div className="p-6 max-w-3xl mx-auto">
         <button
           onClick={() => navigate(-1)}
@@ -560,13 +583,25 @@ export default function NewOrder() {
                       />
                     </div>
                   ))}
-                  <div className="col-span-2 text-center">
+                  <div className="col-span-2 flex flex-col items-center gap-1">
                     <input
                       type="checkbox"
                       checked={item.isOpenBox}
                       onChange={() => toggleOpenBox(idx)}
                       className="w-4 h-4 accent-orange-500"
                     />
+                    {item.isOpenBox && (
+                      <button
+                        onClick={() => openBoxEdit(idx)}
+                        className={`text-xs px-2 py-0.5 rounded-lg transition ${
+                          item.openBoxData
+                            ? 'text-green-600 bg-green-50 hover:bg-green-100'
+                            : 'text-orange-600 bg-orange-100 hover:bg-orange-200'
+                        }`}
+                      >
+                        {item.openBoxData ? '✓ 已填' : '填寫 ▸'}
+                      </button>
+                    )}
                   </div>
                   <div className="col-span-1 text-right">
                     <button onClick={() => removeItem(idx)} className="p-1 text-gray-300 hover:text-red-400 transition">
