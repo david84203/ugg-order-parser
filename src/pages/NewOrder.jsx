@@ -54,20 +54,23 @@ function parseExcel(file) {
           const newIdx = orderQtyCols[1]    // 新品數量
           const items = rows.slice(swanHeaderIdx + 2)
             .filter(r => r[nameIdx])
-            .map(r => {
+            .flatMap(r => {
               const msrp = Number(r[priceIdx]) || 0
               const sQty = Number(r[sampleIdx]) || 0
               const nQty = Number(r[newIdx]) || 0
               const sPct = Number(r[samplePctIdx]) || 0
               const dPct = Number(r[discountIdx]) || 0
-              const sRate = sPct || dPct  // 樣品無折扣時 fallback 用新品折扣
+              const sRate = sPct || dPct
               const nRate = dPct || sPct
-              const totalCost = Math.round(msrp * sRate) * sQty + Math.round(msrp * nRate) * nQty
-              const qty = sQty + nQty
-              const cost = qty > 0 ? Math.round(totalCost / qty) : 0
-              return { name: String(r[nameIdx] || '').trim(), price: msrp, cost, qty, isOpenBox: false }
+              const name = String(r[nameIdx] || '').trim()
+              if (!name || msrp === 0 || (sQty + nQty) === 0) return []
+              const result = []
+              // 樣品 → 開盒遊戲（isOpenBox: true）
+              if (sQty > 0) result.push({ name, price: msrp, cost: Math.round(msrp * sRate), qty: sQty, isOpenBox: true })
+              // 新品 → 一般庫存
+              if (nQty > 0) result.push({ name, price: msrp, cost: Math.round(msrp * nRate), qty: nQty, isOpenBox: false })
+              return result
             })
-            .filter(i => i.name && i.qty > 0 && i.price > 0)
           return resolve(items)
         }
 
