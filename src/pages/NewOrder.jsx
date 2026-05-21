@@ -359,6 +359,7 @@ export default function NewOrder() {
         const hasNext = items.findIndex((it, i) => i > openBoxModal.itemIdx && it.isOpenBox && !it.openBoxData) !== -1
         return (
           <OpenBoxFormModal
+            key={openBoxModal.itemIdx}
             item={items[openBoxModal.itemIdx]}
             itemLabel={totalNum > 1 ? `第 ${currentNum} / ${totalNum} 款` : ''}
             hasNext={hasNext}
