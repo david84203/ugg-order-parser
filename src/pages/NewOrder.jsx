@@ -22,8 +22,20 @@ function parseExcel(file) {
     reader.onload = e => {
       try {
         const wb = XLSX.read(e.target.result, { type: 'array' })
-        const ws = wb.Sheets[wb.SheetNames[0]]
-        const rows = XLSX.utils.sheet_to_json(ws, { header: 1, defval: '' })
+
+        // 掃描所有工作表，找第一個有內容的 rows
+        let rows = []
+        for (const sheetName of wb.SheetNames) {
+          const ws = wb.Sheets[sheetName]
+          const r = XLSX.utils.sheet_to_json(ws, { header: 1, defval: '' })
+          // 新天鵝堡訂購單：找含 Order Qty + Name Chinese 的 sheet
+          if (r.some(row => row.some(c => String(c) === 'Order Qty') && row.some(c => String(c) === 'Name Chinese'))) {
+            rows = r
+            break
+          }
+          // 其他格式：第一個有足夠資料的 sheet
+          if (!rows.length && r.length >= 2) rows = r
+        }
         if (rows.length < 2) return resolve([])
 
         // 新天鵝堡格式：有 "Order Qty" + "Name Chinese" + "MSRP" 的表頭列
