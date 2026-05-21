@@ -47,18 +47,26 @@ function parseExcel(file) {
           const h = rows[swanHeaderIdx].map(String)
           const nameIdx = h.indexOf('Name Chinese')
           const priceIdx = h.indexOf('MSRP')
+          const samplePctIdx = h.indexOf('Sample%')   // 樣品折數
+          const discountIdx = h.indexOf('Discount')    // 新品折數
           const orderQtyCols = h.reduce((acc, v, i) => v === 'Order Qty' ? [...acc, i] : acc, [])
           const sampleIdx = orderQtyCols[0] // 樣品數量
           const newIdx = orderQtyCols[1]    // 新品數量
           const items = rows.slice(swanHeaderIdx + 2)
             .filter(r => r[nameIdx])
-            .map(r => ({
-              name: String(r[nameIdx] || '').trim(),
-              price: Number(r[priceIdx]) || 0,
-              cost: 0,
-              qty: (Number(r[sampleIdx]) || 0) + (Number(r[newIdx]) || 0),
-              isOpenBox: false,
-            }))
+            .map(r => {
+              const msrp = Number(r[priceIdx]) || 0
+              const sQty = Number(r[sampleIdx]) || 0
+              const nQty = Number(r[newIdx]) || 0
+              const sPct = Number(r[samplePctIdx]) || 0
+              const dPct = Number(r[discountIdx]) || 0
+              const sRate = sPct || dPct  // 樣品無折扣時 fallback 用新品折扣
+              const nRate = dPct || sPct
+              const totalCost = Math.round(msrp * sRate) * sQty + Math.round(msrp * nRate) * nQty
+              const qty = sQty + nQty
+              const cost = qty > 0 ? Math.round(totalCost / qty) : 0
+              return { name: String(r[nameIdx] || '').trim(), price: msrp, cost, qty, isOpenBox: false }
+            })
             .filter(i => i.name && i.qty > 0 && i.price > 0)
           return resolve(items)
         }
