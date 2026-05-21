@@ -7,7 +7,7 @@ import { useSuppliers } from '../hooks/useSuppliers'
 import { useOrders } from '../hooks/useOrders'
 import { db } from '../firebase/config'
 import { collection, getDocs, query, where, addDoc, updateDoc, doc, increment } from 'firebase/firestore'
-import { parseOrderText } from '../utils/orderParser'
+import { parseOrderText, parseOrionText } from '../utils/orderParser'
 
 function detectColumn(headers, keywords) {
   return headers.findIndex(h =>
@@ -26,18 +26,18 @@ function parseExcel(file) {
         if (rows.length < 2) return resolve([])
 
         const headers = rows[0].map(String)
-        const nameIdx = detectColumn(headers, ['名稱', 'name', '品名', '遊戲', '商品'])
-        const priceIdx = detectColumn(headers, ['定價', '售價', 'price', '原價'])
-        const costIdx = detectColumn(headers, ['進價', '成本', 'cost', '進貨', '單價', '金額'])
-        const qtyIdx = detectColumn(headers, ['數量', 'qty', 'quantity', '訂購'])
+        const nameIdx = detectColumn(headers, ['名稱', 'name', '品名', '遊戲'])
+        const priceIdx = detectColumn(headers, ['定價', '售價', 'price', '原價', '零售'])
+        const costIdx = detectColumn(headers, ['進價', '成本', 'cost', '進貨', '單價', '批發'])
+        const qtyIdx = detectColumn(headers, ['數量', 'qty', 'quantity', '訂購', '訂量'])
 
         const items = rows.slice(1).filter(r => r[nameIdx]).map(r => ({
           name: String(r[nameIdx] || '').trim(),
           price: Number(r[priceIdx]) || 0,
           cost: Number(r[costIdx]) || 0,
-          qty: Number(r[qtyIdx]) || 1,
+          qty: Number(r[qtyIdx]) || 0,
           isOpenBox: false,
-        })).filter(i => i.name)
+        })).filter(i => i.name && i.qty > 0)
 
         resolve(items)
       } catch (err) {
@@ -90,11 +90,12 @@ export default function NewOrder() {
   const { suppliers } = useSuppliers()
   const { addOrder } = useOrders()
   const fileRef = useRef()
+  const pdfRef = useRef()
 
   const initSupplierId = searchParams.get('supplierId') || ''
   const initSupplierName = searchParams.get('supplierName') || ''
 
-  const [inputTab, setInputTab] = useState('text') // 'text' | 'file'
+  const [inputTab, setInputTab] = useState('text') // 'text' | 'pdf' | 'file'
   const [step, setStep] = useState(1)
   const [supplierId, setSupplierId] = useState(initSupplierId)
   const [supplierName, setSupplierName] = useState(initSupplierName)
@@ -132,6 +133,25 @@ export default function NewOrder() {
       const parsed = await parseExcel(file)
       if (!parsed.length) throw new Error('解析結果為空，請確認檔案格式')
       setItems(parsed)
+      setStep(2)
+    } catch (err) {
+      setParseError(err.message || '解析失敗')
+    } finally {
+      setParsing(false)
+    }
+  }
+
+  async function handlePdf(file) {
+    if (!file) return
+    setFileName(file.name)
+    setParsing(true)
+    setParseError('')
+    try {
+      const { extractPdfText } = await import('../utils/pdfParser')
+      const text = await extractPdfText(file)
+      const parsed = parseOrionText(text)
+      if (!parsed.length) throw new Error('找不到可解析的品項，請確認為 Orion 報價單格式。')
+      setItems(parsed.map(i => ({ name: i.name, price: i.msrp, cost: i.unitCost, qty: i.qty, isOpenBox: false })))
       setStep(2)
     } catch (err) {
       setParseError(err.message || '解析失敗')
@@ -324,7 +344,7 @@ export default function NewOrder() {
 
             {/* 輸入方式切換 */}
             <div className="bg-white rounded-2xl border border-gray-100 shadow-sm p-5">
-              <div className="flex gap-2 mb-4">
+              <div className="flex flex-wrap gap-2 mb-4">
                 <button
                   onClick={() => { setInputTab('text'); setParseError('') }}
                   className={`flex items-center gap-2 px-4 py-2 rounded-xl text-sm font-medium transition ${
@@ -337,6 +357,17 @@ export default function NewOrder() {
                   <span className="text-xs text-gray-400">（玩坊）</span>
                 </button>
                 <button
+                  onClick={() => { setInputTab('pdf'); setParseError('') }}
+                  className={`flex items-center gap-2 px-4 py-2 rounded-xl text-sm font-medium transition ${
+                    inputTab === 'pdf'
+                      ? 'bg-orange-50 text-orange-600 border border-orange-200'
+                      : 'text-gray-500 border border-gray-200 hover:bg-gray-50'
+                  }`}
+                >
+                  <FileText size={14} /> PDF 上傳
+                  <span className="text-xs text-gray-400">（Orion）</span>
+                </button>
+                <button
                   onClick={() => { setInputTab('file'); setParseError('') }}
                   className={`flex items-center gap-2 px-4 py-2 rounded-xl text-sm font-medium transition ${
                     inputTab === 'file'
@@ -345,7 +376,7 @@ export default function NewOrder() {
                   }`}
                 >
                   <Upload size={14} /> Excel 上傳
-                  <span className="text-xs text-gray-400">（其他廠商）</span>
+                  <span className="text-xs text-gray-400">（其他 / Orion）</span>
                 </button>
               </div>
 
@@ -367,6 +398,28 @@ export default function NewOrder() {
                 </>
               )}
 
+              {inputTab === 'pdf' && (
+                <div
+                  onClick={() => pdfRef.current.click()}
+                  className="border-2 border-dashed border-gray-200 rounded-xl p-10 text-center cursor-pointer hover:border-orange-300 hover:bg-orange-50 transition"
+                >
+                  {parsing ? (
+                    <div className="text-gray-500">
+                      <div className="animate-spin text-3xl mb-2">⏳</div>
+                      <p className="text-sm">解析中...</p>
+                    </div>
+                  ) : (
+                    <>
+                      <div className="flex justify-center gap-4 mb-3">
+                        <FileText size={32} className="text-red-400" />
+                      </div>
+                      <p className="text-sm font-medium text-gray-600">點擊選擇 Orion 報價單 PDF</p>
+                      <p className="text-xs text-gray-400 mt-1">支援 .pdf（華勝桌遊訂購單）</p>
+                    </>
+                  )}
+                </div>
+              )}
+
               {inputTab === 'file' && (
                 <div
                   onClick={() => fileRef.current.click()}
@@ -383,7 +436,7 @@ export default function NewOrder() {
                         <FileSpreadsheet size={32} className="text-green-400" />
                       </div>
                       <p className="text-sm font-medium text-gray-600">點擊選擇或拖放檔案</p>
-                      <p className="text-xs text-gray-400 mt-1">支援 .xlsx、.xls</p>
+                      <p className="text-xs text-gray-400 mt-1">支援 .xlsx、.xls（含 Orion 訂購單明細）</p>
                     </>
                   )}
                 </div>
@@ -395,6 +448,13 @@ export default function NewOrder() {
                 accept=".xlsx,.xls"
                 className="hidden"
                 onChange={e => handleFile(e.target.files[0])}
+              />
+              <input
+                ref={pdfRef}
+                type="file"
+                accept=".pdf"
+                className="hidden"
+                onChange={e => handlePdf(e.target.files[0])}
               />
 
               {parseError && (

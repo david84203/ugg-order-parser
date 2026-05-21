@@ -38,3 +38,22 @@ export function parseOrderText(text) {
 
   return items
 }
+
+/**
+ * 解析 Orion（華勝桌遊）PDF 報價單文字
+ * 支援格式：序號(4碼) 品名規格 個 數量 單價.NNN 金額.NNN
+ * 單價為未稅，name 可含空格
+ */
+export function parseOrionText(text) {
+  const items = []
+  const re = /\d{4}\s+(.+?)\s+個\s+(\d+)\s+([\d,]+\.\d+)\s+[\d,]+\.\d+/g
+  let match
+  while ((match = re.exec(text)) !== null) {
+    const name = match[1].trim()
+    const qty = parseInt(match[2])
+    const unitCostPreTax = parseFloat(match[3].replace(/,/g, ''))
+    const unitCost = Math.round(unitCostPreTax * 1.05)
+    if (name && qty > 0) items.push({ name, qty, msrp: 0, unitCost, isOpenBox: false })
+  }
+  return items
+}
