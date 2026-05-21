@@ -55,6 +55,7 @@ async function syncToInventory(items) {
       const q = query(collection(db, 'inventory'), where('name', '==', item.name))
       const snap = await getDocs(q)
       if (snap.empty) {
+        const p = item.price || 0
         await addDoc(collection(db, 'inventory'), {
           name: item.name,
           price: item.price,
@@ -62,7 +63,7 @@ async function syncToInventory(items) {
           stock: item.qty,
           players: '',
           minAge: '',
-          rental: 0,
+          rental: p > 0 ? Math.ceil(p / 500) * 50 : 0,
           imageUrl: '',
           createdAt: Date.now(),
         })

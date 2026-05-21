@@ -63,23 +63,27 @@ export default function Inventory() {
         ) : (
           <div className="bg-white rounded-2xl border border-gray-100 shadow-sm overflow-hidden">
             <div className="grid grid-cols-12 text-xs font-medium text-gray-400 bg-gray-50 px-4 py-2 border-b border-gray-100">
-              <div className="col-span-6">遊戲名稱</div>
+              <div className="col-span-5">遊戲名稱</div>
               <div className="col-span-2 text-right">售價</div>
               <div className="col-span-2 text-right">進價</div>
-              <div className="col-span-2 text-right">庫存</div>
+              <div className="col-span-2 text-right">租金</div>
+              <div className="col-span-1 text-right">庫存</div>
             </div>
             {filtered.length === 0 ? (
               <div className="text-center text-gray-400 py-10">找不到符合的遊戲</div>
             ) : filtered.map(g => (
               <div key={g.id} className="grid grid-cols-12 items-center px-4 py-3 border-b border-gray-50 last:border-0 hover:bg-gray-50 transition">
-                <div className="col-span-6 text-sm font-medium text-gray-800">{g.name}</div>
+                <div className="col-span-5 text-sm font-medium text-gray-800">{g.name}</div>
                 <div className="col-span-2 text-sm text-right text-gray-600">
                   {g.price ? `NT$${g.price.toLocaleString()}` : '—'}
                 </div>
                 <div className="col-span-2 text-sm text-right text-gray-600">
                   {g.cost ? `NT$${g.cost.toLocaleString()}` : '—'}
                 </div>
-                <div className="col-span-2 text-right">
+                <div className="col-span-2 text-sm text-right text-gray-600">
+                  {g.rental > 0 ? `NT$${g.rental.toLocaleString()}` : '—'}
+                </div>
+                <div className="col-span-1 text-right">
                   <span className={`text-sm font-medium ${g.stock === 0 ? 'text-red-400' : 'text-gray-700'}`}>
                     {g.stock || 0}
                   </span>
