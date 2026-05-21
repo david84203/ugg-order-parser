@@ -15,6 +15,7 @@ function detectColumn(headers, keywords) {
   )
 }
 
+
 function parseExcel(file) {
   return new Promise((resolve, reject) => {
     const reader = new FileReader()
