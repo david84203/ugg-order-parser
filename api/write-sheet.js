@@ -51,7 +51,7 @@ export default async function handler(req, res) {
       row[17] = g.tag2 || ''             // R: 標籤2
       row[18] = g.tag3 || ''             // S: 標籤3
       row[19] = g.sticker || ''          // T: 貼紙
-      row[20] = g.imageUrl ? 'v' : ''   // U: 圖片（有上傳就打v）
+      row[20] = g.imageUrl || ''          // U: 圖片（Firebase Storage URL 或空）
       row[21] = g.youtubeLink || ''      // V: 教學
       row[22] = g.source || ''           // W: 出處
       row[23] = g.playerMode || ''       // X: 玩家模式
