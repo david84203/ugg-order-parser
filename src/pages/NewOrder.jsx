@@ -25,6 +25,32 @@ function parseExcel(file) {
         const rows = XLSX.utils.sheet_to_json(ws, { header: 1, defval: '' })
         if (rows.length < 2) return resolve([])
 
+        // 新天鵝堡格式：有 "Order Qty" + "Name Chinese" + "MSRP" 的表頭列
+        const swanHeaderIdx = rows.findIndex(row =>
+          row.some(c => String(c) === 'Order Qty') &&
+          row.some(c => String(c) === 'Name Chinese')
+        )
+        if (swanHeaderIdx !== -1) {
+          const h = rows[swanHeaderIdx].map(String)
+          const nameIdx = h.indexOf('Name Chinese')
+          const priceIdx = h.indexOf('MSRP')
+          const orderQtyCols = h.reduce((acc, v, i) => v === 'Order Qty' ? [...acc, i] : acc, [])
+          const sampleIdx = orderQtyCols[0] // 樣品數量
+          const newIdx = orderQtyCols[1]    // 新品數量
+          const items = rows.slice(swanHeaderIdx + 2)
+            .filter(r => r[nameIdx])
+            .map(r => ({
+              name: String(r[nameIdx] || '').trim(),
+              price: Number(r[priceIdx]) || 0,
+              cost: 0,
+              qty: (Number(r[sampleIdx]) || 0) + (Number(r[newIdx]) || 0),
+              isOpenBox: false,
+            }))
+            .filter(i => i.name && i.qty > 0 && i.price > 0)
+          return resolve(items)
+        }
+
+        // 通用格式
         const headers = rows[0].map(String)
         const nameIdx = detectColumn(headers, ['名稱', 'name', '品名', '遊戲'])
         const priceIdx = detectColumn(headers, ['定價', '售價', 'price', '原價', '零售'])
@@ -436,7 +462,7 @@ export default function NewOrder() {
                         <FileSpreadsheet size={32} className="text-green-400" />
                       </div>
                       <p className="text-sm font-medium text-gray-600">點擊選擇或拖放檔案</p>
-                      <p className="text-xs text-gray-400 mt-1">支援 .xlsx、.xls（含 Orion 訂購單明細）</p>
+                      <p className="text-xs text-gray-400 mt-1">支援 .xlsx、.xls（新天鵝堡 / Orion 訂購單）</p>
                     </>
                   )}
                 </div>
