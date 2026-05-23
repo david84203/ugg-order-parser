@@ -74,6 +74,38 @@ function parseExcel(file) {
           return resolve(items)
         }
 
+        // 狗吠火車格式：有「新品數量」和「樣品數量」欄位
+        const dogHeaderIdx = rows.findIndex(row =>
+          row.some(c => String(c).trim() === '新品數量') &&
+          row.some(c => String(c).trim() === '樣品數量')
+        )
+        if (dogHeaderIdx !== -1) {
+          const h = rows[dogHeaderIdx].map(c => String(c).trim())
+          const nameIdx = h.indexOf('遊戲名稱')
+          const priceIdx = h.indexOf('定價')
+          const costIdx = h.indexOf('價格')
+          const sampleCostIdx = h.indexOf('樣品價')
+          const sQtyIdx = h.indexOf('樣品數量')
+          const nQtyIdx = h.indexOf('新品數量')
+          const dogItems = rows.slice(dogHeaderIdx + 1)
+            .filter(r => r[nameIdx])
+            .flatMap(r => {
+              const name = String(r[nameIdx] || '').trim()
+              if (!name) return []
+              const msrp = Number(r[priceIdx]) || 0
+              const newCost = Number(r[costIdx]) || 0
+              const sampleCost = Number(r[sampleCostIdx]) || newCost
+              const sQty = Number(r[sQtyIdx]) || 0
+              const nQty = Number(r[nQtyIdx]) || 0
+              if (sQty + nQty === 0) return []
+              const result = []
+              if (sQty > 0) result.push({ name, price: msrp, cost: sampleCost, qty: sQty, isOpenBox: true })
+              if (nQty > 0) result.push({ name, price: msrp, cost: newCost, qty: nQty, isOpenBox: false })
+              return result
+            })
+          return resolve(dogItems)
+        }
+
         // 通用格式
         const headers = rows[0].map(String)
         const nameIdx = detectColumn(headers, ['名稱', 'name', '品名', '遊戲'])
