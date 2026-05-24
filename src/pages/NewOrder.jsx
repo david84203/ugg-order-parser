@@ -377,7 +377,8 @@ export default function NewOrder() {
         createdAt: Date.now(),
       })
 
-      setSyncResult({ ...result, openBoxAdded: openBoxItems.length })
+      const totalQty = inventorySyncItems.reduce((s, i) => s + (Number(i.qty) || 0), 0)
+      setSyncResult({ ...result, openBoxAdded: openBoxItems.length, totalQty })
       setStep(3)
     } catch (err) {
       setParseError(err.message)
@@ -727,14 +728,15 @@ export default function NewOrder() {
             <div className="w-16 h-16 bg-green-50 rounded-full flex items-center justify-center mx-auto mb-4">
               <Check size={32} className="text-green-500" />
             </div>
-            <h2 className="text-lg font-bold text-gray-800 mb-2">匯入完成！</h2>
-            <div className="text-sm text-gray-500 space-y-1">
-              <p>庫存新增 <strong className="text-gray-700">{syncResult.added}</strong> 款・更新 <strong className="text-gray-700">{syncResult.updated}</strong> 款</p>
+            <h2 className="text-lg font-bold text-gray-800 mb-2">成功匯入庫存！</h2>
+            <div className="text-sm text-gray-500 space-y-2">
+              <p className="text-base font-medium text-gray-700">本次共匯入 <strong className="text-orange-500 font-bold">{syncResult.totalQty || 0}</strong> 盒遊戲</p>
+              <p className="text-xs text-gray-400">（新建遊戲 <strong className="text-gray-600 font-semibold">{syncResult.added}</strong> 款 ‧ 現有庫存加量 <strong className="text-gray-600 font-semibold">{syncResult.updated}</strong> 款）</p>
               {syncResult.openBoxAdded > 0 && (
-                <p>開盒遊戲 <strong className="text-orange-600">{syncResult.openBoxAdded}</strong> 款已寫入 Google Sheet</p>
+                <p className="text-orange-600 text-xs">開盒遊戲 <strong className="font-semibold">{syncResult.openBoxAdded}</strong> 款已寫入 Google Sheet</p>
               )}
               {syncResult.errors.length > 0 && (
-                <p className="text-red-500">失敗 {syncResult.errors.length} 款：{syncResult.errors.join('、')}</p>
+                <p className="text-red-500 text-xs">失敗 {syncResult.errors.length} 款：{syncResult.errors.join('、')}</p>
               )}
             </div>
             <div className="flex gap-3 mt-6">
