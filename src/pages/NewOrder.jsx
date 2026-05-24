@@ -1,6 +1,6 @@
 import { useState, useRef } from 'react'
 import { useNavigate, useSearchParams } from 'react-router-dom'
-import { ArrowLeft, Upload, FileSpreadsheet, FileText, Trash2, Check, AlertCircle } from 'lucide-react'
+import { ArrowLeft, Upload, FileSpreadsheet, FileText, Trash2, Check, AlertCircle, Edit2 } from 'lucide-react'
 import OpenBoxFormModal from '../components/OpenBoxFormModal'
 import * as XLSX from 'xlsx'
 import { useSuppliers } from '../hooks/useSuppliers'
@@ -496,6 +496,17 @@ export default function NewOrder() {
                   <Upload size={14} /> Excel 上傳
                   <span className="text-xs text-gray-400">（其他 / Orion）</span>
                 </button>
+                <button
+                  onClick={() => { setInputTab('manual'); setParseError('') }}
+                  className={`flex items-center gap-2 px-4 py-2 rounded-xl text-sm font-medium transition ${
+                    inputTab === 'manual'
+                      ? 'bg-orange-50 text-orange-600 border border-orange-200'
+                      : 'text-gray-500 border border-gray-200 hover:bg-gray-50'
+                  }`}
+                >
+                  <Edit2 size={14} /> 手動輸入
+                  <span className="text-xs text-gray-400">（同業調貨）</span>
+                </button>
               </div>
 
               {inputTab === 'text' && (
@@ -557,6 +568,23 @@ export default function NewOrder() {
                       <p className="text-xs text-gray-400 mt-1">支援 .xlsx、.xls（新天鵝堡 / Orion 訂購單）</p>
                     </>
                   )}
+                </div>
+              )}
+
+              {inputTab === 'manual' && (
+                <div
+                  onClick={() => {
+                    setItems([{ name: '', price: '', cost: '', qty: 1, isOpenBox: false }])
+                    setFileName('同業調貨 / 手動輸入')
+                    setStep(2)
+                  }}
+                  className="border-2 border-dashed border-gray-200 rounded-xl p-10 text-center cursor-pointer hover:border-orange-300 hover:bg-orange-50 transition"
+                >
+                  <div className="flex justify-center gap-4 mb-3">
+                    <Edit2 size={32} className="text-orange-400" />
+                  </div>
+                  <p className="text-sm font-medium text-gray-600">點擊開始手動輸入</p>
+                  <p className="text-xs text-gray-400 mt-1">適合少量品項、同業調貨無報價單時使用</p>
                 </div>
               )}
 
