@@ -349,7 +349,7 @@ export default function NewOrder() {
         if (!res.ok) throw new Error('Google Sheet 寫入失敗')
       }
 
-      await addOrder({
+      const orderId = await addOrder({
         supplierId: supplierId || '',
         supplierName: supplierName || selectedSupplier?.name || '',
         orderDate,
@@ -364,6 +364,18 @@ export default function NewOrder() {
       if (supplierId) {
         await updateDoc(doc(db, 'suppliers', supplierId), { lastOrderDate: orderDate })
       }
+
+      // ── 同步進貨支出到記帳系統（purchaseOrders collection）──
+      await addDoc(collection(db, 'purchaseOrders'), {
+        orderId,
+        orderDate,
+        monthKey: orderDate.slice(0, 7),   // "2026-05"
+        supplierName: supplierName || selectedSupplier?.name || '未指定',
+        totalAmount,
+        inventoryCost,
+        openBoxCost,
+        createdAt: Date.now(),
+      })
 
       setSyncResult({ ...result, openBoxAdded: openBoxItems.length })
       setStep(3)
