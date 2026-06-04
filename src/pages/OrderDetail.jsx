@@ -61,12 +61,14 @@ export default function OrderDetail() {
             stock: item.qty,
             players: '', minAge: '', rental: 0, imageUrl: '',
             createdAt: Date.now(),
+            ...(order.orderDate && { lastPurchaseDate: order.orderDate }),
           })
         } else {
           await updateDoc(snap.docs[0].ref, {
             ...(item.price > 0 && { price: item.price }),
             ...(item.cost > 0 && { cost: item.cost }),
             stock: increment(item.qty),
+            ...(order.orderDate && { lastPurchaseDate: order.orderDate }),
           })
         }
       }

@@ -130,7 +130,7 @@ function parseExcel(file) {
   })
 }
 
-async function syncToInventory(items) {
+async function syncToInventory(items, orderDate) {
   const results = { added: 0, updated: 0, errors: [] }
   for (const item of items) {
     try {
@@ -148,6 +148,7 @@ async function syncToInventory(items) {
           rental: p > 0 ? Math.ceil(p / 500) * 50 : 0,
           imageUrl: '',
           createdAt: Date.now(),
+          ...(orderDate && { lastPurchaseDate: orderDate }),
         })
         results.added++
       } else {
@@ -156,6 +157,7 @@ async function syncToInventory(items) {
           ...(item.price > 0 && { price: item.price }),
           ...(item.cost > 0 && { cost: item.cost }),
           stock: increment(item.qty),
+          ...(orderDate && { lastPurchaseDate: orderDate }),
         })
         results.updated++
       }
@@ -314,7 +316,7 @@ export default function NewOrder() {
       ]
       let result = { added: 0, updated: 0, errors: [] }
       if (inventorySyncItems.length > 0) {
-        result = await syncToInventory(inventorySyncItems)
+        result = await syncToInventory(inventorySyncItems, orderDate)
       }
 
       // 開盒 → Google Sheet（每款只寫 1 盒，帶入 Modal 填入的完整資料）
