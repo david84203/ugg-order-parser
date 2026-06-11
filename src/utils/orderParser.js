@@ -4,6 +4,7 @@
  */
 export function parseOrderText(text) {
   const items = []
+  const skipped = [] // 解析失敗被略過的品項，給 UI 提示用
   const blocks = text.split(/(?=【)/).filter(b => b.trim().startsWith('【'))
 
   for (const block of blocks) {
@@ -13,11 +14,11 @@ export function parseOrderText(text) {
     // 品名：移除【XX】前綴，移除開頭的 (備注) 標記
     let name = lines[0].replace(/^【[^】]+】/, '').trim()
     name = name.replace(/^\([^)]+\)\s*/, '').trim()
-    if (!name) continue
+    if (!name) { skipped.push(lines[0].slice(0, 20)); continue }
 
     // 數量：X.00 件
     const qtyMatch = block.match(/(\d+)\.00\s*件/)
-    if (!qtyMatch) continue
+    if (!qtyMatch) { skipped.push(name); continue }
     const qty = parseInt(qtyMatch[1])
 
     // 定價（原廠建議售價）：數量行後第一個 price.xx
@@ -36,6 +37,7 @@ export function parseOrderText(text) {
     items.push({ name, qty, msrp, unitCost, total, isOpenBox: false })
   }
 
+  items.skipped = skipped
   return items
 }
 

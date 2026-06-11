@@ -6,7 +6,7 @@ import * as XLSX from 'xlsx'
 import { useSuppliers } from '../hooks/useSuppliers'
 import { useOrders } from '../hooks/useOrders'
 import { db } from '../firebase/config'
-import { collection, getDocs, query, where, addDoc, updateDoc, doc, increment } from 'firebase/firestore'
+import { collection, getDocs, query, where, addDoc, setDoc, updateDoc, doc, increment } from 'firebase/firestore'
 import { parseOrderText, parseOrionText } from '../utils/orderParser'
 
 function detectColumn(headers, keywords) {
@@ -138,18 +138,20 @@ async function syncToInventory(items, orderDate) {
       const snap = await getDocs(q)
       if (snap.empty) {
         const p = item.price || 0
-        await addDoc(collection(db, 'inventory'), {
+        // 名稱當文件 ID＋merge＋increment：兩台同時匯入同款新遊戲不會重複建檔
+        const newId = item.name.replace(/\//g, '_')
+        await setDoc(doc(db, 'inventory', newId), {
           name: item.name,
           price: item.price,
           cost: item.cost,
-          stock: item.qty,
+          stock: increment(item.qty),
           players: '',
           minAge: '',
           rental: p > 0 ? Math.ceil(p / 500) * 50 : 0,
           imageUrl: '',
           createdAt: Date.now(),
           ...(orderDate && { lastPurchaseDate: orderDate }),
-        })
+        }, { merge: true })
         results.added++
       } else {
         const ref = doc(db, 'inventory', snap.docs[0].id)
@@ -205,6 +207,9 @@ export default function NewOrder() {
     // 玩坊格式：msrp → price, unitCost → cost
     setItems(parsed.map(i => ({ name: i.name, price: i.msrp, cost: i.unitCost, qty: i.qty, isOpenBox: false })))
     setFileName('玩坊文字訂單')
+    if (parsed.skipped?.length) {
+      setParseError(`有 ${parsed.skipped.length} 個品項解析失敗已略過：${parsed.skipped.join('、')}（請手動補上）`)
+    }
     setStep(2)
   }
 
@@ -305,7 +310,7 @@ export default function NewOrder() {
   const totalAmount = inventoryCost + openBoxCost
 
   async function handleConfirm() {
-    if (!items.filter(i => i.name).length) return
+    if (syncing || !items.filter(i => i.name).length) return
     setSyncing(true)
     setParseError('')
     try {
