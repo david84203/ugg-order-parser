@@ -250,9 +250,34 @@ export default function NewOrder() {
   }
 
   function updateItem(idx, key, val) {
-    setItems(prev => prev.map((item, i) =>
-      i === idx ? { ...item, [key]: key === 'name' ? val : Number(val) || 0 } : item
-    ))
+    setItems(prev => prev.map((item, i) => {
+      if (i !== idx) return item
+      const updated = { ...item, [key]: key === 'name' ? val : Number(val) || 0 }
+      if (key === 'price' && item.costMode === 'discount' && item.discountInput) {
+        updated.cost = Math.round(updated.price * (Number(item.discountInput) || 0) / 10)
+      }
+      return updated
+    }))
+  }
+
+  function toggleCostMode(idx) {
+    setItems(prev => prev.map((item, i) => {
+      if (i !== idx) return item
+      if (item.costMode === 'discount') {
+        return { ...item, costMode: 'amount', discountInput: '' }
+      }
+      const price = item.price || 0
+      const discountInput = price > 0 ? String(Math.round(item.cost / price * 100) / 10) : ''
+      return { ...item, costMode: 'discount', discountInput }
+    }))
+  }
+
+  function updateDiscountInput(idx, val) {
+    setItems(prev => prev.map((item, i) => {
+      if (i !== idx) return item
+      const cost = item.price > 0 ? Math.round(item.price * (Number(val) || 0) / 10) : 0
+      return { ...item, discountInput: val, cost }
+    }))
   }
 
   function toggleOpenBox(idx) {
@@ -298,7 +323,7 @@ export default function NewOrder() {
   }
 
   function addBlankItem() {
-    setItems(prev => [...prev, { name: '', price: 0, cost: 0, qty: 1, isOpenBox: false }])
+    setItems(prev => [...prev, { name: '', price: 0, cost: 0, qty: 1, isOpenBox: false, costMode: 'amount', discountInput: '' }])
   }
 
   const inventoryItems = items.filter(i => !i.isOpenBox)
@@ -653,17 +678,54 @@ export default function NewOrder() {
                       onChange={e => updateItem(idx, 'name', e.target.value)}
                     />
                   </div>
-                  {['price', 'cost', 'qty'].map(key => (
-                    <div key={key} className="col-span-2 pr-2 last:col-span-1">
+                  {/* 定價 */}
+                  <div className="col-span-2 pr-2">
+                    <input
+                      type="number" min="0"
+                      className="w-full text-sm text-right text-gray-700 bg-transparent border-b border-transparent hover:border-gray-200 focus:border-orange-400 focus:outline-none py-0.5"
+                      value={item.price}
+                      onChange={e => updateItem(idx, 'price', e.target.value)}
+                    />
+                  </div>
+
+                  {/* 進價（可切換金額/折扣） */}
+                  <div className="col-span-2 pr-2">
+                    <div className="flex items-center gap-0.5">
+                      <button
+                        onClick={() => toggleCostMode(idx)}
+                        className={`text-xs shrink-0 px-1 py-0.5 rounded transition ${item.costMode === 'discount' ? 'text-orange-500 bg-orange-100' : 'text-gray-300 hover:text-gray-500'}`}
+                        title={item.costMode === 'discount' ? '切換為金額' : '切換為折扣'}
+                      >
+                        {item.costMode === 'discount' ? '折' : '元'}
+                      </button>
                       <input
-                        type="number"
-                        min="0"
+                        type="number" min="0"
+                        max={item.costMode === 'discount' ? 10 : undefined}
+                        step={item.costMode === 'discount' ? 0.5 : 1}
                         className="w-full text-sm text-right text-gray-700 bg-transparent border-b border-transparent hover:border-gray-200 focus:border-orange-400 focus:outline-none py-0.5"
-                        value={item[key]}
-                        onChange={e => updateItem(idx, key, e.target.value)}
+                        value={item.costMode === 'discount' ? (item.discountInput ?? '') : item.cost}
+                        onChange={e => item.costMode === 'discount'
+                          ? updateDiscountInput(idx, e.target.value)
+                          : updateItem(idx, 'cost', e.target.value)
+                        }
                       />
                     </div>
-                  ))}
+                    {item.costMode === 'discount' && item.discountInput !== '' && (
+                      <div className="text-xs text-gray-400 text-right leading-none mt-0.5">
+                        = NT${item.cost.toLocaleString()}
+                      </div>
+                    )}
+                  </div>
+
+                  {/* 數量 */}
+                  <div className="col-span-1 pr-2">
+                    <input
+                      type="number" min="0"
+                      className="w-full text-sm text-right text-gray-700 bg-transparent border-b border-transparent hover:border-gray-200 focus:border-orange-400 focus:outline-none py-0.5"
+                      value={item.qty}
+                      onChange={e => updateItem(idx, 'qty', e.target.value)}
+                    />
+                  </div>
                   <div className="col-span-2 flex flex-col items-center gap-1">
                     <input
                       type="checkbox"
