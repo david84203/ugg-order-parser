@@ -1,6 +1,6 @@
 import { useState, useRef } from 'react'
 import { useNavigate, useSearchParams } from 'react-router-dom'
-import { ArrowLeft, Upload, FileSpreadsheet, FileText, Trash2, Check, AlertCircle, Edit2 } from 'lucide-react'
+import { ArrowLeft, Upload, FileSpreadsheet, FileText, Trash2, Check, AlertCircle, Edit2, Gift } from 'lucide-react'
 import OpenBoxFormModal from '../components/OpenBoxFormModal'
 import * as XLSX from 'xlsx'
 import { useSuppliers } from '../hooks/useSuppliers'
@@ -540,6 +540,17 @@ export default function NewOrder() {
                   <Edit2 size={14} /> 手動輸入
                   <span className="text-xs text-gray-400">（同業調貨）</span>
                 </button>
+                <button
+                  onClick={() => { setInputTab('gift'); setParseError('') }}
+                  className={`flex items-center gap-2 px-4 py-2 rounded-xl text-sm font-medium transition ${
+                    inputTab === 'gift'
+                      ? 'bg-pink-50 text-pink-600 border border-pink-200'
+                      : 'text-gray-500 border border-gray-200 hover:bg-gray-50'
+                  }`}
+                >
+                  <Gift size={14} /> 廠商贈品
+                  <span className="text-xs text-gray-400">（送的開盒遊戲）</span>
+                </button>
               </div>
 
               {inputTab === 'text' && (
@@ -618,6 +629,39 @@ export default function NewOrder() {
                   </div>
                   <p className="text-sm font-medium text-gray-600">點擊開始手動輸入</p>
                   <p className="text-xs text-gray-400 mt-1">適合少量品項、同業調貨無報價單時使用</p>
+                </div>
+              )}
+
+              {inputTab === 'gift' && (
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                  <div
+                    onClick={() => {
+                      setItems([{ name: '', price: '', cost: 0, qty: 1, isOpenBox: true, openBoxData: null }])
+                      setFileName('廠商贈品（開盒樣品）')
+                      setStep(2)
+                    }}
+                    className="border-2 border-dashed border-pink-200 rounded-xl p-8 text-center cursor-pointer hover:border-pink-300 hover:bg-pink-50 transition"
+                  >
+                    <div className="flex justify-center mb-3">
+                      <Gift size={30} className="text-pink-400" />
+                    </div>
+                    <p className="text-sm font-medium text-gray-600">開盒樣品</p>
+                    <p className="text-xs text-gray-400 mt-1">拆封展示用<br/>→ 進價 0、寫入開盒清單</p>
+                  </div>
+                  <div
+                    onClick={() => {
+                      setItems([{ name: '', price: '', cost: 0, qty: 1, isOpenBox: false }])
+                      setFileName('廠商贈品（全新販售品）')
+                      setStep(2)
+                    }}
+                    className="border-2 border-dashed border-pink-200 rounded-xl p-8 text-center cursor-pointer hover:border-pink-300 hover:bg-pink-50 transition"
+                  >
+                    <div className="flex justify-center mb-3">
+                      <Gift size={30} className="text-pink-400" />
+                    </div>
+                    <p className="text-sm font-medium text-gray-600">全新販售品</p>
+                    <p className="text-xs text-gray-400 mt-1">直接上架販售<br/>→ 進價 0、加入庫存</p>
+                  </div>
                 </div>
               )}
 
