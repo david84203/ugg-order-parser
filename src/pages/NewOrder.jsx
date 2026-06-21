@@ -336,6 +336,13 @@ export default function NewOrder() {
 
   async function handleConfirm() {
     if (syncing || !items.filter(i => i.name).length) return
+    // 開盒遊戲還沒填寫資料 → 自動彈出填寫表單，不讓空資料匯入
+    const needFill = items.findIndex(i => i.isOpenBox && i.name && !i.openBoxData)
+    if (needFill !== -1) {
+      setParseError('開盒遊戲請先填寫資料（BGG／圖片／人數）再匯入')
+      setOpenBoxModal({ open: true, itemIdx: needFill })
+      return
+    }
     setSyncing(true)
     setParseError('')
     try {
