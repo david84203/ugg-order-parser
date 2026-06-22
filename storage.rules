@@ -1,0 +1,21 @@
+rules_version = '2';
+
+// 烏嘎嘎內部進貨/庫存工具的圖片儲存規則
+// 這些 App 沒有登入機制（純內部後台），故開放這兩個圖片資料夾讀寫。
+// 顧客端 APP 需顯示圖片 → 公開可讀。
+service firebase.storage {
+  match /b/{bucket}/o {
+
+    // 庫存遊戲圖片（ugg-inventory）
+    match /inventory/{allPaths=**} {
+      allow read: if true;
+      allow write: if true;
+    }
+
+    // 開盒 / 租借遊戲圖片（ugg-order-parser）
+    match /rental-games/{allPaths=**} {
+      allow read: if true;
+      allow write: if true;
+    }
+  }
+}
