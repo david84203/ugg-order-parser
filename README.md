@@ -1,5 +1,15 @@
 # React + Vite
 
+## Deployment notes
+
+Image uploads go through `/api/upload-image` instead of writing to Firebase Storage from the browser.
+
+Required Vercel environment variables:
+
+- `GOOGLE_SERVICE_ACCOUNT_JSON`: Google service account JSON. It must have permission to create objects in the Firebase Storage bucket.
+- `FIREBASE_STORAGE_BUCKET`: `ugg-store-system.firebasestorage.app`
+- `VITE_FIREBASE_STORAGE_BUCKET`: used by Firebase web config.
+
 This template provides a minimal setup to get React working in Vite with HMR and some ESLint rules.
 
 Currently, two official plugins are available:

@@ -1,7 +1,6 @@
 import { useState, useRef } from 'react'
 import { X, Search, Loader2, ImagePlus, ChevronDown, ChevronUp } from 'lucide-react'
-import { ref, uploadBytes, getDownloadURL } from 'firebase/storage'
-import { storage } from '../firebase/config'
+import { uploadImage } from '../utils/uploadImage'
 
 function calcRental(price) {
   const p = Number(price) || 0
@@ -99,11 +98,7 @@ export default function OpenBoxFormModal({ item, itemLabel, hasNext, onSave, onS
     try {
       let imageUrl = ''
       if (imageFile) {
-        const ext = imageFile.name.split('.').pop()
-        const path = `rental-games/${Date.now()}_${item.name}.${ext}`
-        const storageRef = ref(storage, path)
-        await uploadBytes(storageRef, imageFile)
-        imageUrl = await getDownloadURL(storageRef)
+        imageUrl = await uploadImage(imageFile, 'rental-games', item.name)
       }
       onSave({ ...form, price: price || item.price || 0, cost: cost || item.cost || 0, rental, imageUrl })
     } catch (err) {
@@ -313,10 +308,7 @@ export default function OpenBoxFormModal({ item, itemLabel, hasNext, onSave, onS
                 try {
                   let imageUrl = ''
                   if (imageFile) {
-                    const ext = imageFile.name.split('.').pop()
-                    const storageRef = ref(storage, `rental-games/${Date.now()}_${item.name}.${ext}`)
-                    await uploadBytes(storageRef, imageFile)
-                    imageUrl = await getDownloadURL(storageRef)
+                    imageUrl = await uploadImage(imageFile, 'rental-games', item.name)
                   }
                   onSaveNext({ ...form, price: price || item.price || 0, cost: cost || item.cost || 0, rental, imageUrl })
                 } catch (err) {
